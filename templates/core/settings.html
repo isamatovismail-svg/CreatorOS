@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings & Security - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Settings & Security Center ⚙️</h1>
+    <p style="color: var(--text-secondary);">Manage BYOK keys, Telegram bot fallback connections, and audit system logs.</p>
+</div>
+
+{% if messages %}
+<div style="margin-bottom: 1.5rem;">
+    {% for message in messages %}
+    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-weight: 500;">
+        <i class="fa-solid fa-circle-check" style="margin-right: 0.5rem;"></i> {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="dashboard-grid">
+    <!-- Settings Form -->
+    <div class="card-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fa-solid fa-user-shield" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Credentials & Preferences</h2>
+        </div>
+        <form class="quick-draft-form" method="POST">
+            {% csrf_token %}
+            
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Telegram Chat ID</label>
+            <input type="text" name="telegram_chat_id" value="{{ profile.telegram_chat_id|default:'' }}" placeholder="e.g. 8371308176">
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">OpenAI API Key (BYOK)</label>
+            <input type="password" name="openai_api_key" placeholder="{{ profile.masked_openai_key }}">
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred LLM Model</label>
+            <select name="preferred_llm">
+                <option value="default_llm" {% if profile.preferred_llm == 'default_llm' %}selected{% endif %}>Default LLM (OpenAI + Freemium Fallback)</option>
+            </select>
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred Visual Generator</label>
+            <select name="preferred_image_gen">
+                <option value="pollinations" {% if profile.preferred_image_gen == 'pollinations' %}selected{% endif %}>Pollinations.ai (Free 8K 9:16)</option>
+            </select>
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred TTS Voice Synthesizer</label>
+            <select name="preferred_tts">
+                <option value="default_tts" {% if profile.preferred_tts == 'default_tts' %}selected{% endif %}>Google Text-to-Speech (gTTS MP3)</option>
+            </select>
+
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                <i class="fa-solid fa-floppy-disk"></i> Save All Settings
+            </button>
+        </form>
+    </div>
+
+    <!-- Audit System Log -->
+    <div class="card-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fa-solid fa-list-check" style="color: #eab308; margin-right: 0.5rem;"></i> System Audit Logs</h2>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            {% for log in logs %}
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                    <span style="font-weight: 600; color: #818cf8;">[{{ log.module }}]</span>
+                    <span style="color: var(--text-muted); font-size: 0.75rem;">{{ log.created_at|date:"H:i:s" }}</span>
+                </div>
+                <div style="color: var(--text-secondary);">{{ log.message }}</div>
+            </div>
+            {% empty %}
+            <div style="color: var(--text-muted); text-align: center; padding: 1rem 0;">
+                No system logs recorded yet.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

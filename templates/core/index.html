@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Welcome to CreatorOS 🚀</h1>
+    <p style="color: var(--text-secondary);">Your centralized workspace for content creation, scheduling, and Telegram fallback automation.</p>
+</div>
+
+{% if messages %}
+<div style="margin-bottom: 1.5rem;">
+    {% for message in messages %}
+    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-weight: 500;">
+        <i class="fa-solid fa-circle-check" style="margin-right: 0.5rem;"></i> {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Stats Overview -->
+<div class="grid-stats">
+    <div class="stat-card">
+        <div class="stat-title">Total Posts</div>
+        <div class="stat-value">{{ stats.total_posts }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-solid fa-layer-group"></i> Active library
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Ready for Manual Upload</div>
+        <div class="stat-value">{{ stats.ready_manual }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-paper-plane fa-solid" style="color: #818cf8;"></i> Telegram Fallback Active
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Published Posts</div>
+        <div class="stat-value">{{ stats.published }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-solid fa-check-double"></i> API Sync
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Telegram Chat ID</div>
+        <div class="stat-value" style="font-size: 1.4rem;">
+            {% if profile.telegram_chat_id %}
+                <span style="color: #10b981;">{{ profile.telegram_chat_id }}</span>
+            {% else %}
+                <span style="color: #eab308;">Not Connected</span>
+            {% endif %}
+        </div>
+        <div class="stat-trend trend-up">
+            <i class="fa-brands fa-telegram" style="color: #229ED9;"></i> Fallback Notifications
+        </div>
+    </div>
+</div>
+
+<!-- Main Panels -->
+<div class="dashboard-grid">
+    <!-- Content Pipeline -->
+    <div class="card-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--accent-primary);"></i> Recent Content Pipeline</h2>
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Live Feed</span>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem;">
+                    <th style="padding: 0.75rem 0;">Title</th>
+                    <th style="padding: 0.75rem 0;">Platform</th>
+                    <th style="padding: 0.75rem 0;">Status</th>
+                    <th style="padding: 0.75rem 0;">Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 1rem 0; font-weight: 500;">
+                        <a href="{% url 'core:post_detail' post.id %}" style="color: var(--text-primary); text-decoration: none;">{{ post.title }}</a>
+                    </td>
+                    <td style="padding: 1rem 0; color: var(--text-secondary);">
+                        {% if post.target_platform == 'youtube' %}
+                            <i class="fa-brands fa-youtube" style="color: #ff0000; margin-right: 0.4rem;"></i> YouTube
+                        {% elif post.target_platform == 'instagram' %}
+                            <i class="fa-brands fa-instagram" style="color: #ec4899; margin-right: 0.4rem;"></i> Instagram
+                        {% elif post.target_platform == 'tiktok' %}
+                            <i class="fa-brands fa-tiktok" style="color: #00f2fe; margin-right: 0.4rem;"></i> TikTok
+                        {% elif post.target_platform == 'twitter' %}
+                            <i class="fa-brands fa-x-twitter" style="color: #fff; margin-right: 0.4rem;"></i> X / Twitter
+                        {% else %}
+                            <i class="fa-solid fa-share-nodes" style="color: #818cf8; margin-right: 0.4rem;"></i> Multi-Platform
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem 0;">
+                        {% if post.status == 'READY_MANUAL' %}
+                            <span style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Ready for Manual</span>
+                        {% elif post.status == 'PUBLISHED' %}
+                            <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Published</span>
+                        {% elif post.status == 'GENERATING' %}
+                            <span style="background: rgba(234, 179, 8, 0.15); color: #eab308; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Generating</span>
+                        {% else %}
+                            <span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">{{ post.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem 0; color: var(--text-muted); font-size: 0.85rem;">{{ post.created_at|date:"M d, H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" style="padding: 1.5rem 0; text-align: center; color: var(--text-muted);">
+                        No posts generated yet. Create your first post using the Quick Draft generator!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Side Controls -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Quick Idea Draft & Generation Trigger -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #eab308;"></i> Quick AI Post Generator</h2>
+            </div>
+            <form class="quick-draft-form" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_draft">
+                <input type="text" name="title" placeholder="Content topic or headline hook..." required>
+                <select name="target_platform">
+                    <option value="all">Multi-Platform (Reels / TikTok / Shorts)</option>
+                    <option value="youtube">YouTube Shorts</option>
+                    <option value="instagram">Instagram Reels</option>
+                    <option value="tiktok">TikTok Video</option>
+                    <option value="twitter">X / Twitter Post</option>
+                </select>
+                <textarea name="notes" rows="3" placeholder="Jot down optional notes or prompt..."></textarea>
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Generate & Deliver to Telegram
+                </button>
+            </form>
+        </div>
+
+        <!-- Telegram & BYOK Configuration Card -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-brands fa-telegram" style="margin-right: 0.5rem; color: #229ED9;"></i> Telegram & BYOK Setup</h2>
+            </div>
+            <form class="quick-draft-form" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_settings">
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Telegram Chat ID (for Fallback Delivery)</label>
+                <input type="text" name="telegram_chat_id" value="{{ profile.telegram_chat_id|default:'' }}" placeholder="e.g. 123456789">
+                
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">OpenAI / BYOK Key (Optional)</label>
+                <input type="password" name="openai_api_key" placeholder="{{ profile.masked_openai_key }}">
+                
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; background: rgba(255,255,255,0.08); box-shadow: none; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

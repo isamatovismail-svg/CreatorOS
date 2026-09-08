@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Analytics & System Performance 📊</h1>
+    <p style="color: var(--text-secondary);">Track content production efficiency, pipeline statuses, and Telegram fallback delivery metrics.</p>
+</div>
+
+<div class="grid-stats">
+    <div class="stat-card">
+        <div class="stat-title">Total Generated Posts</div>
+        <div class="stat-value">{{ stats.total_posts }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-solid fa-chart-bar"></i> Lifetime Production
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Telegram Fallbacks Sent</div>
+        <div class="stat-value">{{ stats.ready_manual }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-paper-plane fa-solid" style="color: #229ED9;"></i> 100% Uptime Guaranteed
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">API Auto-Posts</div>
+        <div class="stat-value">{{ stats.published }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-solid fa-check"></i> Verified Sync
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Pipeline Efficiency</div>
+        <div class="stat-value" style="color: #10b981;">{{ stats.efficiency }}</div>
+        <div class="stat-trend trend-up">
+            <i class="fa-solid fa-bolt"></i> Zero Bottlenecks
+        </div>
+    </div>
+</div>
+
+<div class="card-panel">
+    <div class="panel-header">
+        <h2 class="panel-title"><i class="fa-solid fa-signal" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> System Resilience Report</h2>
+    </div>
+    <p style="color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem;">
+        CreatorOS enforces a <strong>provider-agnostic architecture</strong>. If external API rate limits or token expirations occur, the built-in fallback automatically dispatches full content packages directly to your Telegram chat.
+    </p>
+</div>
+{% endblock %}

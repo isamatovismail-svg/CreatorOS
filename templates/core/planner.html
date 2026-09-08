@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Content Planner - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Content Planner & Calendar 📅</h1>
+    <p style="color: var(--text-secondary);">Schedule and organize your content across YouTube, TikTok, Instagram, and X.</p>
+</div>
+
+<div class="card-panel">
+    <div class="panel-header">
+        <h2 class="panel-title"><i class="fa-solid fa-calendar-days" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Scheduled & Ready Queue</h2>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem;">
+                <th style="padding: 0.75rem 0;">Post Title</th>
+                <th style="padding: 0.75rem 0;">Target Channel</th>
+                <th style="padding: 0.75rem 0;">Status</th>
+                <th style="padding: 0.75rem 0;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in posts %}
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <td style="padding: 1rem 0; font-weight: 500;">
+                    <a href="{% url 'core:post_detail' post.id %}" style="color: var(--text-primary); text-decoration: none;">{{ post.title }}</a>
+                </td>
+                <td style="padding: 1rem 0; color: var(--text-secondary);">{{ post.get_target_platform_display }}</td>
+                <td style="padding: 1rem 0;">
+                    <span style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                        {{ post.get_status_display }}
+                    </span>
+                </td>
+                <td style="padding: 1rem 0;">
+                    <a href="{% url 'core:post_detail' post.id %}" style="color: var(--accent-primary); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                        Manage Post <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="padding: 2rem 0; text-align: center; color: var(--text-muted);">
+                    No scheduled posts yet. Generate new content from the Dashboard!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

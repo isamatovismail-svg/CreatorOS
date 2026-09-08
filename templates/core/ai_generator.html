@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Studio - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">AI Studio & Prompt Lab 🪄</h1>
+    <p style="color: var(--text-secondary);">Directly generate custom hooks, scripts, image prompts, and voiceovers using your active AI providers.</p>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899; margin-right: 0.5rem;"></i> Custom Prompt Playground</h2>
+        </div>
+        <form class="quick-draft-form" action="{% url 'core:index' %}" method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_draft">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Topic or Hook</label>
+            <input type="text" name="title" placeholder="e.g. 5 AI Tools that will double your productivity..." required>
+            
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Target Channel</label>
+            <select name="target_platform">
+                <option value="youtube">YouTube Shorts (Vertical 9:16)</option>
+                <option value="instagram">Instagram Reels</option>
+                <option value="tiktok">TikTok Video</option>
+                <option value="twitter">X / Twitter Thread</option>
+            </select>
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Tone of Voice & Prompt Directives</label>
+            <textarea name="notes" rows="4" placeholder="e.g. Energetic, fast-paced, include engaging call to action at the end..."></textarea>
+            
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                <i class="fa-solid fa-play"></i> Synthesize Assets Now
+            </button>
+        </form>
+    </div>
+
+    <div class="card-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fa-solid fa-server" style="color: #10b981; margin-right: 0.5rem;"></i> Active Providers</h2>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 600; margin-bottom: 0.2rem;">LLM Engine</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">
+                    {% if profile.openai_api_key %}
+                        OpenAI GPT-3.5/4o (BYOK Active)
+                    {% else %}
+                        CreatorOS Freemium Fallback Engine
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 600; margin-bottom: 0.2rem;">Voice Synthesis (TTS)</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Google Text-to-Speech (gTTS MP3)</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-sm);">
+                <div style="font-weight: 600; margin-bottom: 0.2rem;">Visual Generator</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Pollinations.ai (Free 8K 9:16)</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

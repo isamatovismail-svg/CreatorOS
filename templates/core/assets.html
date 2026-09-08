@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Assets Library - CreatorOS{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 2rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Assets Library 📁</h1>
+    <p style="color: var(--text-secondary);">Browse, preview audio voiceovers, and download synthesized media assets with 1-click.</p>
+</div>
+
+<div class="card-panel">
+    <div class="panel-header">
+        <h2 class="panel-title"><i class="fa-solid fa-folder-open" style="color: #818cf8; margin-right: 0.5rem;"></i> Generated Content Media Packages</h2>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem;">
+                <th style="padding: 0.75rem 0;">Post Title</th>
+                <th style="padding: 0.75rem 0;">Audio Voiceover (MP3)</th>
+                <th style="padding: 0.75rem 0;">Visual Background</th>
+                <th style="padding: 0.75rem 0;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in posts %}
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <td style="padding: 1rem 0; font-weight: 500;">
+                    <a href="{% url 'core:post_detail' post.id %}" style="color: var(--text-primary); text-decoration: none;">{{ post.title }}</a>
+                </td>
+                <td style="padding: 1rem 0;">
+                    {% if post.audio_file_path %}
+                        <audio controls style="height: 36px; max-width: 200px;">
+                            <source src="{% url 'core:download_media' post.id 'audio' %}" type="audio/mpeg">
+                            Your browser does not support audio elements.
+                        </audio>
+                    {% else %}
+                        <span style="color: var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 1rem 0; color: var(--text-secondary);">
+                    {% if post.media_file_path %}
+                        <i class="fa-solid fa-image" style="color: #818cf8; margin-right: 0.3rem;"></i> Image Generated
+                    {% else %}
+                        <span style="color: var(--text-muted);">N/A</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 1rem 0;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        {% if post.audio_file_path %}
+                        <a href="{% url 'core:download_media' post.id 'audio' %}" class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; background: rgba(99,102,241,0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.4); box-shadow: none;">
+                            <i class="fa-solid fa-download"></i> MP3
+                        </a>
+                        {% endif %}
+                        {% if post.media_file_path %}
+                        <a href="{% url 'core:download_media' post.id 'image' %}" class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); box-shadow: none;">
+                            <i class="fa-solid fa-download"></i> Image
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="padding: 2rem 0; text-align: center; color: var(--text-muted);">
+                    No media assets synthesized yet. Generate your first post from the Dashboard!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

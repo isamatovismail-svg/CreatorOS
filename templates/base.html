@@ -1,0 +1,96 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CreatorOS - Content & Creator Workspace{% endblock %}</title>
+    <meta name="description" content="CreatorOS - Next Generation Content Creation & Workspace Platform">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <a href="{% url 'core:index' %}" class="brand-logo">
+                <div class="logo-icon">C</div>
+                <span class="brand-name">CreatorOS</span>
+            </a>
+
+            <div class="nav-section">
+                <div class="nav-title">General</div>
+                <ul class="nav-menu">
+                    <li class="nav-item {% if active_tab == 'dashboard' %}active{% endif %}">
+                        <a href="{% url 'core:index' %}">
+                            <i class="fa-solid fa-chart-pie"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_tab == 'planner' %}active{% endif %}">
+                        <a href="{% url 'core:planner' %}">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                            <span>Content Planner</span>
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_tab == 'ai_generator' %}active{% endif %}">
+                        <a href="{% url 'core:ai_generator' %}">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>AI Generator</span>
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_tab == 'analytics' %}active{% endif %}">
+                        <a href="{% url 'core:analytics' %}">
+                            <i class="fa-solid fa-chart-line"></i>
+                            <span>Analytics</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Management</div>
+                <ul class="nav-menu">
+                    <li class="nav-item {% if active_tab == 'assets' %}active{% endif %}">
+                        <a href="{% url 'core:assets' %}">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <span>Assets Library</span>
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_tab == 'settings' %}active{% endif %}">
+                        <a href="{% url 'core:settings' %}">
+                            <i class="fa-solid fa-gear"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content Workspace -->
+        <div class="main-content">
+            <header class="top-header">
+                <div class="header-search">
+                    <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
+                    <input type="text" placeholder="Search posts, ideas, assets...">
+                </div>
+
+                <div class="header-actions">
+                    <a href="{% url 'core:index' %}" class="btn-primary">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>New Post</span>
+                    </a>
+                </div>
+            </header>
+
+            <main class="page-body">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
