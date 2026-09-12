@@ -8,7 +8,6 @@ from services.pipeline.generator import ContentPipelineGenerator
 from bot.fallback_manager import TelegramFallbackManager
 
 def _get_demo_user():
-    """Returns or creates a default demo user for dashboard interactions and syncs .env settings."""
     user, _ = User.objects.get_or_create(username='demo_creator')
     profile, _ = UserProfile.objects.get_or_create(user=user)
 
