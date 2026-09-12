@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Settings & Security - CreatorOS{% endblock %}
+{% block title %}Settings & Preferences - CreatorOS{% endblock %}
 
 {% block content %}
 <div class="dashboard-header" style="margin-bottom: 2rem;">
-    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Settings & Security Center ⚙️</h1>
-    <p style="color: var(--text-secondary);">Manage BYOK keys, Telegram bot fallback connections, and audit system logs.</p>
+    <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem;">Settings & Content Preferences ⚙️</h1>
+    <p style="color: var(--text-secondary);">Configure content style, Telegram account linking, BYOK keys, and automated daily schedule.</p>
 </div>
 
 {% if messages %}
@@ -19,42 +19,106 @@
 {% endif %}
 
 <div class="dashboard-grid">
-    <!-- Settings Form -->
-    <div class="card-panel">
-        <div class="panel-header">
-            <h2 class="panel-title"><i class="fa-solid fa-user-shield" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Credentials & Preferences</h2>
+    <!-- Left Column: Settings Form -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Telegram Linking Card -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-brands fa-telegram" style="color: #229ED9; margin-right: 0.5rem;"></i> Telegram Account Linking</h2>
+                {% if profile.telegram_chat_id %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                    Connected (ID: {{ profile.telegram_chat_id }})
+                </span>
+                {% else %}
+                <span style="background: rgba(234, 179, 8, 0.15); color: #eab308; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                    Not Linked
+                </span>
+                {% endif %}
+            </div>
+
+            {% if profile.telegram_linking_code %}
+            <div style="background: rgba(99, 102, 241, 0.15); border: 1px solid #6366f1; padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem;">Send this command to Telegram Bot:</div>
+                <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #fff; letter-spacing: 2px; margin: 0.5rem 0;">
+                    /start {{ profile.telegram_linking_code }}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Open bot and click Start or paste command</div>
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="generate_code">
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; background: rgba(34, 158, 217, 0.2); color: #229ED9; border: 1px solid rgba(34, 158, 217, 0.4); box-shadow: none;">
+                    <i class="fa-solid fa-key"></i> Generate Telegram Linking Code
+                </button>
+            </form>
         </div>
-        <form class="quick-draft-form" method="POST">
-            {% csrf_token %}
-            
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Telegram Chat ID</label>
-            <input type="text" name="telegram_chat_id" value="{{ profile.telegram_chat_id|default:'' }}" placeholder="e.g. 8371308176">
 
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">OpenAI API Key (BYOK)</label>
-            <input type="password" name="openai_api_key" placeholder="{{ profile.masked_openai_key }}">
+        <!-- Content Preferences Form -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-solid fa-sliders" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Content Generation Preferences</h2>
+            </div>
+            <form class="quick-draft-form" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_preferences">
 
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred LLM Model</label>
-            <select name="preferred_llm">
-                <option value="default_llm" {% if profile.preferred_llm == 'default_llm' %}selected{% endif %}>Default LLM (OpenAI + Freemium Fallback)</option>
-            </select>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Primary Language</label>
+                <select name="language">
+                    <option value="Russian" {% if profile.language == 'Russian' %}selected{% endif %}>Russian (Русский)</option>
+                    <option value="Uzbek" {% if profile.language == 'Uzbek' %}selected{% endif %}>Uzbek (O'zbekcha)</option>
+                    <option value="English" {% if profile.language == 'English' %}selected{% endif %}>English</option>
+                </select>
 
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred Visual Generator</label>
-            <select name="preferred_image_gen">
-                <option value="pollinations" {% if profile.preferred_image_gen == 'pollinations' %}selected{% endif %}>Pollinations.ai (Free 8K 9:16)</option>
-            </select>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Content Niche</label>
+                <select name="niche">
+                    <option value="AI and technology" {% if profile.niche == 'AI and technology' %}selected{% endif %}>AI & Technology</option>
+                    <option value="Business & Finance" {% if profile.niche == 'Business & Finance' %}selected{% endif %}>Business & Finance</option>
+                    <option value="Productivity & Self-Improvement" {% if profile.niche == 'Productivity & Self-Improvement' %}selected{% endif %}>Productivity & Self-Improvement</option>
+                    <option value="Health & Fitness" {% if profile.niche == 'Health & Fitness' %}selected{% endif %}>Health & Fitness</option>
+                </select>
 
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Preferred TTS Voice Synthesizer</label>
-            <select name="preferred_tts">
-                <option value="default_tts" {% if profile.preferred_tts == 'default_tts' %}selected{% endif %}>Google Text-to-Speech (gTTS MP3)</option>
-            </select>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Target Audience</label>
+                <input type="text" name="target_audience" value="{{ profile.target_audience|default:'Beginners' }}">
 
-            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
-                <i class="fa-solid fa-floppy-disk"></i> Save All Settings
-            </button>
-        </form>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Content Style / Tone</label>
+                <input type="text" name="style" value="{{ profile.style|default:'Educational and engaging' }}">
+
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Target Video Duration (Seconds)</label>
+                <input type="number" name="duration_seconds" value="{{ profile.duration_seconds|default:45 }}" min="15" max="90">
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+                    <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">OpenAI API Key (BYOK Key)</label>
+                    <input type="password" name="openai_api_key" placeholder="{{ profile.masked_openai_key }}">
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <span style="font-weight: 600;">Daily Automated Video Generation</span>
+                        <input type="checkbox" name="daily_enabled" style="width: 20px; height: 20px;" {% if profile.daily_enabled %}checked{% endif %}>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Daily Time</label>
+                            <input type="time" name="daily_time" value="{{ profile.daily_time|default:'10:00' }}">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Timezone</label>
+                            <input type="text" name="timezone" value="{{ profile.timezone|default:'Asia/Tashkent' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 1.5rem;">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Preferences
+                </button>
+            </form>
+        </div>
     </div>
 
-    <!-- Audit System Log -->
+    <!-- Right Column: Audit Logs -->
     <div class="card-panel">
         <div class="panel-header">
             <h2 class="panel-title"><i class="fa-solid fa-list-check" style="color: #eab308; margin-right: 0.5rem;"></i> System Audit Logs</h2>

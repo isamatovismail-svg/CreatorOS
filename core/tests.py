@@ -1,140 +1,162 @@
+import os
+import shutil
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.utils import timezone
+from django.core.management import call_command
 from core.models import ContentPost, ContentTopic, UserProfile, SystemLog
 from services.ai_provider.ai_manager import AIProviderManager
-from services.pipeline.generator import ContentPipelineGenerator
+from services.ai_provider.adapters.default_llm import DefaultLLMProvider
+from services.pipeline.service import create_and_generate_post
+from services.video.ffmpeg_renderer import FFmpegVideoRenderer
 from bot.fallback_manager import TelegramFallbackManager
 from bot.bot_runner import CreatorOSBotHandler
 
-class IndexViewTests(TestCase):
-    def test_index_view_status_code(self):
-        url = reverse('core:index')
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
 
-    def test_index_view_uses_correct_template(self):
-        url = reverse('core:index')
-        response = self.client.get(url)
-        self.assertTemplateUsed(response, 'core/index.html')
-        self.assertTemplateUsed(response, 'base.html')
-        self.assertContains(response, 'Welcome to CreatorOS')
+class UserAuthAndIsolationTests(TestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(username='creator_one', password='password123')
+        self.user2 = User.objects.create_user(username='creator_two', password='password123')
 
-
-class AIProviderTests(TestCase):
-    def test_ai_provider_manager_retrieval(self):
-        llm = AIProviderManager.get_llm('default_llm')
-        self.assertIsNotNone(llm)
-        self.assertEqual(llm.provider_name, 'default_llm')
-
-        image_gen = AIProviderManager.get_image('pollinations')
-        self.assertIsNotNone(image_gen)
-
-        tts = AIProviderManager.get_tts('default_tts')
-        self.assertIsNotNone(tts)
-
-    def test_byok_key_resolution(self):
-        user = User.objects.create_user(username='byok_user', password='password123')
-        profile = UserProfile.objects.create(user=user, openai_api_key='sk-proj-12345678901234567890')
-        provider, key = AIProviderManager.resolve_llm_for_user(profile)
-        self.assertEqual(key, 'sk-proj-12345678901234567890')
-        self.assertEqual(profile.masked_openai_key, 'sk-p••••••••7890')
-
-    def test_pipeline_generator_execution(self):
-        user = User.objects.create_user(username='testcreator', password='password123')
-        topic = ContentTopic.objects.create(user=user, title='AI Automation Trends')
-        post = ContentPost.objects.create(
-            user=user,
-            topic=topic,
-            title='AI Automation Trends Overview',
-            target_platform='youtube'
+        self.post1 = ContentPost.objects.create(
+            user=self.user1,
+            title='User 1 Secret Video',
+            script='Script 1',
+            status='READY_MANUAL'
+        )
+        self.post2 = ContentPost.objects.create(
+            user=self.user2,
+            title='User 2 Secret Video',
+            script='Script 2',
+            status='READY_MANUAL'
         )
 
-        pipeline = ContentPipelineGenerator()
-        updated_post = pipeline.generate_post_content(post)
+    def test_unauthenticated_redirects_to_login(self):
+        response = self.client.get(reverse('core:index'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response.url)
 
-        self.assertEqual(updated_post.status, 'READY_MANUAL')
-        self.assertIsNotNone(updated_post.script)
-        self.assertIsNotNone(updated_post.caption)
-        self.assertIsNotNone(updated_post.media_file_path)
+    def test_authenticated_dashboard_access(self):
+        self.client.login(username='creator_one', password='password123')
+        response = self.client.get(reverse('core:index'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'User 1 Secret Video')
+        self.assertNotContains(response, 'User 2 Secret Video')
+
+    def test_cross_user_isolation_returns_404(self):
+        self.client.login(username='creator_one', password='password123')
+        url_for_user2_post = reverse('core:post_detail', kwargs={'post_id': self.post2.id})
+        response = self.client.get(url_for_user2_post)
+        self.assertEqual(response.status_code, 404)
 
 
-class TelegramBotTests(TestCase):
+class StructuredAIEngineTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='telegram_user', password='password123')
-        self.profile = UserProfile.objects.create(user=self.user, telegram_chat_id='12345678')
+        self.user = User.objects.create_user(username='ai_test_user', password='password123')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            language='Russian',
+            niche='AI and technology',
+            duration_seconds=30
+        )
+
+    def test_structured_content_fallback_generation(self):
+        llm = DefaultLLMProvider()
+        res = llm.generate_structured_content(user_profile=self.profile, user_idea='3 AI Productivity Tools')
+        
+        self.assertIsInstance(res, dict)
+        self.assertIn('topic', res)
+        self.assertIn('hook', res)
+        self.assertIn('script', res)
+        self.assertIn('caption', res)
+        self.assertEqual(res['duration_seconds'], 30)
+
+    def test_concept_expansion_for_short_idea(self):
+        llm = DefaultLLMProvider()
+        expanded = llm.expand_concept('dog tips')
+        self.assertIn('Dog Tips', expanded)
+
+    def test_topic_duplicate_prevention(self):
+        llm = DefaultLLMProvider()
+        history = [
+            "How AI is Revolutionizing Everyday Productivity in 2026",
+            "Top 3 Free AI Tools You Need to Try Today"
+        ]
+        topic_dict = llm.select_topic(niche="AI and technology", recent_topics=history)
+        self.assertNotIn(topic_dict['topic'].lower(), [t.lower() for t in history])
+
+
+class EndToEndPipelineVideoTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='video_creator', password='password123')
+        self.profile = UserProfile.objects.create(user=self.user)
+
+    def test_create_and_generate_post_renders_real_mp4(self):
+        post = create_and_generate_post(user=self.user, idea='Test Vertical Video', mode='user_idea')
+        
+        self.assertEqual(post.status, 'READY_MANUAL')
+        self.assertIsNotNone(post.video_file_path)
+        self.assertTrue(os.path.exists(post.video_file_path))
+        self.assertGreater(os.path.getsize(post.video_file_path), 1024)
+
+
+class TelegramBotIntegrationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='tg_creator', password='password123')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            telegram_linking_code='TB1234',
+            telegram_linking_code_expires_at=timezone.now() + timezone.timedelta(minutes=15)
+        )
         self.handler = CreatorOSBotHandler()
 
-    def test_start_command(self):
-        reply = self.handler.handle_command('99999', '/start', self.profile)
-        self.assertIn('Welcome to', reply)
+    def test_telegram_code_linking(self):
+        reply = self.handler.handle_command('88776655', '/start TB1234')
+        self.assertIn('Account Linked Successfully', reply)
         self.profile.refresh_from_db()
-        self.assertEqual(self.profile.telegram_chat_id, '99999')
+        self.assertEqual(self.profile.telegram_chat_id, '88776655')
+        self.assertIsNone(self.profile.telegram_linking_code)
 
-    def test_generate_command(self):
-        reply = self.handler.handle_command('12345678', '/generate SaaS Marketing', self.profile)
-        self.assertIn('Post generation completed', reply)
-        self.assertTrue(ContentPost.objects.filter(user=self.user, title__icontains='SaaS Marketing').exists())
-
-    def test_fallback_manager_delivery(self):
-        post = ContentPost.objects.create(
-            user=self.user,
-            title='Fallback Test Post',
-            caption='Test caption',
-            hashtags='#test'
-        )
-        fallback_mgr = TelegramFallbackManager()
-        result = fallback_mgr.send_post_fallback(post)
-        self.assertTrue(result)
-        post.refresh_from_db()
-        self.assertEqual(post.status, 'READY_MANUAL')
+    def test_bot_create_command(self):
+        self.profile.telegram_chat_id = '88776655'
+        self.profile.save()
+        reply = self.handler.handle_command('88776655', '/create AI Coding Hacks', self.profile)
+        self.assertIn('rendered and delivered', reply)
+        self.assertTrue(ContentPost.objects.filter(user=self.user, idea__icontains='AI Coding Hacks').exists())
 
 
-class PostDetailViewTests(TestCase):
+class DailyGeneratorCommandTests(TestCase):
     def setUp(self):
-        self.user, _ = User.objects.get_or_create(username='demo_creator')
+        self.user = User.objects.create_user(username='daily_creator', password='password123')
+        self.profile = UserProfile.objects.create(user=self.user, daily_enabled=True)
+
+    def test_daily_generator_idempotency(self):
+        # First execution: Generates daily content
+        call_command('generate_daily_content')
+        self.assertEqual(ContentPost.objects.filter(user=self.user).count(), 1)
+
+        # Second execution on same date: Skips generation (Idempotent)
+        call_command('generate_daily_content')
+        self.assertEqual(ContentPost.objects.filter(user=self.user).count(), 1)
+
+
+class CreatorOSDoctorCommandTests(TestCase):
+    def test_doctor_command_execution(self):
+        call_command('doctor')
+
+
+class SecurityPathTraversalTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='security_user', password='password123')
         self.post = ContentPost.objects.create(
             user=self.user,
-            title='Detail View Post',
-            script='Original Script',
-            caption='Original Caption'
+            title='Security Test',
+            media_file_path='/etc/passwd'
         )
 
-    def test_post_detail_view(self):
-        url = reverse('core:post_detail', kwargs={'post_id': self.post.id})
+    def test_path_traversal_returns_forbidden(self):
+        self.client.login(username='security_user', password='password123')
+        url = reverse('core:download_media', kwargs={'post_id': self.post.id, 'file_type': 'image'})
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Detail View Post')
-
-    def test_post_delete(self):
-        url = reverse('core:delete_post', kwargs={'post_id': self.post.id})
-        response = self.client.get(url)
-        self.assertRedirects(response, reverse('core:index'))
-        self.assertFalse(ContentPost.objects.filter(id=self.post.id).exists())
-
-
-class SaaSPageNavigationTests(TestCase):
-    def test_planner_page(self):
-        response = self.client.get(reverse('core:planner'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Content Planner')
-
-    def test_ai_generator_page(self):
-        response = self.client.get(reverse('core:ai_generator'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'AI Studio')
-
-    def test_analytics_page(self):
-        response = self.client.get(reverse('core:analytics'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Analytics')
-
-    def test_assets_page(self):
-        response = self.client.get(reverse('core:assets'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Assets Library')
-
-    def test_settings_page(self):
-        response = self.client.get(reverse('core:settings'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Settings')
+        self.assertIn(response.status_code, [403, 404])

@@ -12,11 +12,14 @@
     </div>
     <div style="display: flex; gap: 0.75rem;">
         <a href="{% url 'core:regenerate_post' post.id %}" class="btn-primary" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); box-shadow: none;">
-            <i class="fa-solid fa-rotate"></i> Regenerate AI Assets
+            <i class="fa-solid fa-rotate"></i> Regenerate AI Video
         </a>
-        <a href="{% url 'core:delete_post' post.id %}" class="btn-primary" onclick="return confirm('Are you sure you want to delete this post?');" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: none;">
-            <i class="fa-solid fa-trash"></i> Delete
-        </a>
+        <form method="POST" action="{% url 'core:delete_post' post.id %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this post?');">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: none;">
+                <i class="fa-solid fa-trash"></i> Delete
+            </button>
+        </form>
     </div>
 </div>
 
@@ -34,7 +37,7 @@
     <!-- Post Script & Copy Editor -->
     <div class="card-panel">
         <div class="panel-header">
-            <h2 class="panel-title"><i class="fa-solid fa-pen-to-square" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Script & Copy Editor</h2>
+            <h2 class="panel-title"><i class="fa-solid fa-pen-to-square" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> Script & Copy Package</h2>
             <span style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
                 {{ post.get_status_display }}
             </span>
@@ -44,59 +47,94 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="save_edits">
             
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Full AI Script</label>
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Hook Line</label>
+            <input type="text" name="hook" value="{{ post.hook|default:'' }}">
+
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Full Script (Voiceover Text)</label>
             <textarea name="script" rows="6">{{ post.script|default:'' }}</textarea>
 
-            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Social Caption</label>
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Social Caption (Ready to Copy)</label>
             <textarea name="caption" rows="3">{{ post.caption|default:'' }}</textarea>
 
             <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Hashtags</label>
             <input type="text" name="hashtags" value="{{ post.hashtags|default:'' }}">
 
-            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Publishing Tips</label>
+                    <input type="text" readonly value="{{ post.promotion_tips|default:'Post during peak engagement hours.' }}">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Best Time</label>
+                    <input type="text" readonly value="{{ post.recommended_publish_time|default:'18:00' }}">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 1rem;">
                 <i class="fa-solid fa-floppy-disk"></i> Save Edits
             </button>
         </form>
     </div>
 
-    <!-- Media Assets Preview -->
+    <!-- Media Assets Preview & Player -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Real 9:16 Video Player -->
         <div class="card-panel">
             <div class="panel-header">
-                <h2 class="panel-title"><i class="fa-solid fa-photo-film" style="color: #eab308; margin-right: 0.5rem;"></i> Generated Assets</h2>
+                <h2 class="panel-title"><i class="fa-solid fa-video" style="color: #eab308; margin-right: 0.5rem;"></i> Vertical 9:16 MP4 Video</h2>
             </div>
             
-            <div style="margin-bottom: 1.2rem;">
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem;">Background Image Asset</div>
-                {% if post.media_file_path %}
-                <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; font-family: monospace; overflow-x: auto;">
-                    <i class="fa-solid fa-file-image" style="color: #818cf8; margin-right: 0.5rem;"></i> {{ post.media_file_path }}
-                </div>
-                {% else %}
-                <span style="color: var(--text-muted);">No image generated yet.</span>
-                {% endif %}
+            {% if post.video_file_path %}
+            <div style="display: flex; flex-direction: column; align-items: center; background: #000; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <video controls style="max-height: 400px; width: auto; aspect-ratio: 9/16; border-radius: 8px;">
+                    <source src="{% url 'core:download_media' post.id 'video' %}" type="video/mp4">
+                    Your browser does not support video playback.
+                </video>
+                <a href="{% url 'core:download_media' post.id 'video' %}" class="btn-primary" style="margin-top: 1rem; width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-download"></i> Download 9:16 MP4 Video
+                </a>
             </div>
+            {% else %}
+            <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
+                <i class="fa-solid fa-film" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                Video not rendered yet. Click "Regenerate AI Video" above.
+            </div>
+            {% endif %}
+        </div>
 
-            <div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem;">Voiceover TTS Audio (MP3)</div>
+        <!-- Audio & Background Download Links -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-solid fa-folder-tree" style="color: #818cf8; margin-right: 0.5rem;"></i> Raw Asset Downloads</h2>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                 {% if post.audio_file_path %}
-                <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; font-family: monospace; overflow-x: auto;">
-                    <i class="fa-solid fa-file-audio" style="color: #ec4899; margin-right: 0.5rem;"></i> {{ post.audio_file_path }}
-                </div>
-                {% else %}
-                <span style="color: var(--text-muted);">No audio synthesized yet.</span>
+                <a href="{% url 'core:download_media' post.id 'audio' %}" class="btn-primary" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); box-shadow: none; justify-content: space-between;">
+                    <span><i class="fa-solid fa-file-audio" style="color: #ec4899; margin-right: 0.5rem;"></i> Voiceover TTS Audio (.mp3)</span>
+                    <i class="fa-solid fa-download"></i>
+                </a>
+                {% endif %}
+
+                {% if post.media_file_path %}
+                <a href="{% url 'core:download_media' post.id 'image' %}" class="btn-primary" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); box-shadow: none; justify-content: space-between;">
+                    <span><i class="fa-solid fa-file-image" style="color: #10b981; margin-right: 0.5rem;"></i> Visual Background Image (.jpg)</span>
+                    <i class="fa-solid fa-download"></i>
+                </a>
                 {% endif %}
             </div>
         </div>
 
+        <!-- Telegram Delivery Details -->
         <div class="card-panel">
             <div class="panel-header">
-                <h2 class="panel-title"><i class="fa-brands fa-telegram" style="color: #229ED9; margin-right: 0.5rem;"></i> Fallback Delivery Status</h2>
+                <h2 class="panel-title"><i class="fa-brands fa-telegram" style="color: #229ED9; margin-right: 0.5rem;"></i> Telegram Delivery Status</h2>
             </div>
-            <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                If automated posting is restricted, this post package is dispatched directly to Telegram Chat ID: 
-                <strong>{{ profile.telegram_chat_id|default:"Not Connected" }}</strong>.
-            </p>
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                <div>Status: <strong>{{ post.get_telegram_delivery_status_display }}</strong></div>
+                {% if post.telegram_sent_at %}
+                <div style="margin-top: 0.3rem; font-size: 0.8rem; color: var(--text-muted);">Delivered at: {{ post.telegram_sent_at|date:"Y-m-d H:i:s" }}</div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>

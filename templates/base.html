@@ -78,7 +78,19 @@
                     <input type="text" placeholder="Search posts, ideas, assets...">
                 </div>
 
-                <div class="header-actions">
+                <div class="header-actions" style="display: flex; align-items: center; gap: 1rem;">
+                    {% if user.is_authenticated %}
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">
+                        <i class="fa-solid fa-user-circle" style="color: var(--accent-primary); font-size: 1.1rem;"></i>
+                        <span style="font-weight: 600;">{{ user.username }}</span>
+                    </div>
+                    <form method="POST" action="{% url 'logout' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;" title="Sign Out">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </form>
+                    {% endif %}
                     <a href="{% url 'core:index' %}" class="btn-primary">
                         <i class="fa-solid fa-plus"></i>
                         <span>New Post</span>

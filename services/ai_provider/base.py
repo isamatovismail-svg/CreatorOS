@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 class BaseLLMProvider(ABC):
     """
@@ -71,5 +71,54 @@ class BaseImageProvider(ABC):
         """
         Generates image from prompt and saves to output_path.
         Returns the absolute file path.
+        """
+        pass
+
+
+class BaseVideoProvider(ABC):
+    """
+    Abstract Base Class for Video Rendering & Generation Providers.
+    """
+    @property
+    @abstractmethod
+    def provider_name(self) -> str:
+        pass
+
+    @abstractmethod
+    def render_video(
+        self,
+        image_path: str,
+        audio_path: str,
+        script_text: str,
+        output_path: str,
+        duration_seconds: int = 45,
+        **kwargs
+    ) -> str:
+        """
+        Renders a vertical 9:16 MP4 video from image, audio, and subtitles.
+        Returns the absolute video file path.
+        """
+        pass
+
+
+class BaseTopicProvider(ABC):
+    """
+    Abstract Base Class for Topic & Trend Selection Providers.
+    """
+    @property
+    @abstractmethod
+    def provider_name(self) -> str:
+        pass
+
+    @abstractmethod
+    def select_topic(
+        self,
+        niche: str,
+        language: str = 'Russian',
+        recent_topics: Optional[List[str]] = None,
+        **kwargs
+    ) -> Dict[str, str]:
+        """
+        Selects a fresh content topic using niche, history, and fallback chains.
         """
         pass
