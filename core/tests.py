@@ -90,7 +90,7 @@ class StructuredAIEngineTests(TestCase):
 class EndToEndPipelineVideoTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='video_creator', password='password123')
-        self.profile = UserProfile.objects.create(user=self.user)
+        self.profile = UserProfile.objects.create(user=self.user, duration_seconds=3)
 
     def test_create_and_generate_post_renders_real_mp4(self):
         post = create_and_generate_post(user=self.user, idea='Test Vertical Video', mode='user_idea')
@@ -106,6 +106,7 @@ class TelegramBotIntegrationTests(TestCase):
         self.user = User.objects.create_user(username='tg_creator', password='password123')
         self.profile = UserProfile.objects.create(
             user=self.user,
+            duration_seconds=3,
             telegram_linking_code='TB1234',
             telegram_linking_code_expires_at=timezone.now() + timezone.timedelta(minutes=15)
         )
@@ -129,7 +130,7 @@ class TelegramBotIntegrationTests(TestCase):
 class DailyGeneratorCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='daily_creator', password='password123')
-        self.profile = UserProfile.objects.create(user=self.user, daily_enabled=True)
+        self.profile = UserProfile.objects.create(user=self.user, duration_seconds=3, daily_enabled=True)
 
     def test_daily_generator_idempotency(self):
         # First execution: Generates daily content
@@ -139,6 +140,7 @@ class DailyGeneratorCommandTests(TestCase):
         # Second execution on same date: Skips generation (Idempotent)
         call_command('generate_daily_content')
         self.assertEqual(ContentPost.objects.filter(user=self.user).count(), 1)
+
 
 
 class CreatorOSDoctorCommandTests(TestCase):

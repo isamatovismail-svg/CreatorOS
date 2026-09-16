@@ -2,6 +2,7 @@ import os
 import random
 import string
 import logging
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import login
