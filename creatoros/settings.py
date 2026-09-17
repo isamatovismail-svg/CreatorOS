@@ -17,8 +17,23 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+import ssl
+
+# Python 3.12 SSL Compatibility Patch for ssl.wrap_socket
+if not hasattr(ssl, 'wrap_socket'):
+    def _compat_wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=None, ca_certs=None, do_handshake_on_connect=True, suppress_ragged_eofs=True, ciphers=None):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER if server_side else ssl.PROTOCOL_TLS_CLIENT)
+        if cert_reqs == ssl.CERT_NONE:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+        if certfile:
+            context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+        return context.wrap_socket(sock, server_side=server_side)
+    ssl.wrap_socket = _compat_wrap_socket
+
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / '.env')
+
 
 
 
