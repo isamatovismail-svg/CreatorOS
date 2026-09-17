@@ -29,11 +29,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Disable background daily content scheduler.'
         )
+        parser.add_argument(
+            '--ssl',
+            action='store_true',
+            help='Enable HTTPS development server (runsslserver).'
+        )
 
     def handle(self, *args, **options):
         port = options.get('port', '8000')
         no_bot = options.get('no_bot', False)
         no_scheduler = options.get('no_scheduler', False)
+        use_ssl = options.get('ssl', False)
         python_exec = sys.executable
 
         self.stdout.write(self.style.MIGRATE_HEADING("=============================================="))
@@ -64,10 +70,13 @@ class Command(BaseCommand):
 
         try:
             # 1. Launch Django Web Server process
-            web_cmd = [python_exec, "manage.py", "runserver", port]
-            self.stdout.write(self.style.SUCCESS(f"[1/3] Starting Web Server on http://127.0.0.1:{port}/..."))
+            server_cmd_name = "runsslserver" if use_ssl else "runserver"
+            scheme = "https" if use_ssl else "http"
+            web_cmd = [python_exec, "manage.py", server_cmd_name, port]
+            self.stdout.write(self.style.SUCCESS(f"[1/3] Starting Web Server on {scheme}://127.0.0.1:{port}/..."))
             web_proc = subprocess.Popen(web_cmd)
             processes.append(("Django Web Server", web_proc))
+
 
             # 2. Launch Telegram Bot Worker process
             if not no_bot:
