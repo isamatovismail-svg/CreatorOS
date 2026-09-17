@@ -114,7 +114,33 @@ class Command(BaseCommand):
         except Exception as e:
             report("FAIL", "Structured AI Script Generator", f"Engine failed: {e}")
 
-        # 9. Telegram Bot Integration
+        # 9. Google OAuth Configuration
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        if client_id and client_secret:
+            masked_client = client_id[:6] + "••••••••" if len(client_id) > 10 else "Configured"
+            report("PASS", "Google OAuth Configuration", f"Client ID: {masked_client}")
+        else:
+            report("WARN", "Google OAuth Configuration", "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not configured in .env (Google OAuth disabled).")
+
+        # 10. OpenAI API Key Configuration
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if openai_key and len(openai_key) > 8:
+            masked_key = openai_key[:4] + "••••••••" + openai_key[-4:]
+            report("PASS", "OpenAI API Key", f"Key configured: {masked_key}")
+        else:
+            report("WARN", "OpenAI API Key", "OPENAI_API_KEY not configured in .env (using local fallback engine).")
+
+        # 11. AI Video Providers Registration
+        try:
+            from services.ai.registry import ProviderRegistry
+            providers = ProviderRegistry.list_all()
+            prov_names = [p.name for p in providers.values()]
+            report("PASS", "AI Video Providers Registered", f"{len(providers)} providers active: {', '.join(prov_names)}")
+        except Exception as e:
+            report("FAIL", "AI Video Providers Registered", f"Registry failure: {e}")
+
+        # 12. Telegram Bot Integration
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if not bot_token or "your_bot_token" in bot_token or bot_token == "MOCK_BOT_TOKEN":
             report("WARN", "Telegram Bot Token", "TELEGRAM_BOT_TOKEN is not set in environment or is using mock value.")
@@ -139,3 +165,4 @@ class Command(BaseCommand):
             sys.exit(1)
         else:
             self.stdout.write(self.style.SUCCESS("✅ CreatorOS System Health Doctor checks completed successfully!"))
+

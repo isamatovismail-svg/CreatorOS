@@ -1,11 +1,13 @@
 import os
 import logging
+import time
 from typing import Optional, Any
 from django.conf import settings
 from django.utils import timezone
-from core.models import ContentPost, SystemLog
-from services.ai_provider.ai_manager import AIProviderManager
-from services.video.ffmpeg_renderer import FFmpegVideoRenderer
+from core.models import ContentPost, SystemLog, AIUsage
+from services.ai.router import AIProviderRouter
+from services.ai.base import QuotaExceededException
+from services.video.validator import validate_video_file, VideoValidationError
 from bot.fallback_manager import TelegramFallbackManager
 
 logger = logging.getLogger(__name__)
@@ -17,30 +19,53 @@ def create_and_generate_post(
     target_platform: str = 'all'
 ) -> ContentPost:
     """
-    Unified entry point for post creation and generation.
-    Shared identically by Web Dashboard and Telegram Bot.
+    Unified Service Layer entry point for post creation and video pipeline execution.
+    Shared identically by Web Dashboard, Scheduler, and Telegram Bot.
     """
     user_profile = getattr(user, 'profile', None)
-    
-    # 1. Gather history topics for duplicate prevention
+    router = AIProviderRouter(user_profile=user_profile)
+
+    # 1. Check daily video limit & idempotency if auto-scheduler
+    if mode == 'daily_scheduler':
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        existing_today = ContentPost.objects.filter(
+            user=user,
+            created_at__gte=today_start
+        ).exists()
+        if existing_today:
+            logger.info(f"Daily generation skipped for {user.username}: already generated today.")
+            return ContentPost.objects.filter(user=user, created_at__gte=today_start).first()
+
+    # 2. Gather topic history for freshness
     history_topics = list(
         ContentPost.objects.filter(user=user)
         .exclude(topic__isnull=True)
         .values_list('topic__title', flat=True)[:10]
     )
 
-    # 2. Get LLM Provider & BYOK key
-    llm_provider, api_key = AIProviderManager.resolve_llm_for_user(user_profile)
-    
-    # 3. Generate structured content
-    structured = llm_provider.generate_structured_content(
-        user_profile=user_profile,
-        user_idea=idea if mode == 'user_idea' else None,
-        history_topics=history_topics,
-        api_key=api_key
-    )
+    # 3. Select AI Provider via Router
+    llm_provider = router.select_llm_provider()
+    video_provider = router.select_video_provider()
 
-    # 4. Create ContentPost in DB
+    # 4. Generate structured content
+    try:
+        structured = llm_provider.generate_script(
+            user_profile=user_profile,
+            prompt=idea if mode == 'user_idea' else (idea or "Latest trends in AI technology"),
+            history_topics=history_topics
+        )
+    except Exception as e:
+        logger.warning(f"Primary LLM generation failed ({e}), using default fallback.")
+        from services.ai_provider.adapters.default_llm import DefaultLLMProvider
+        fallback_llm = DefaultLLMProvider()
+
+        structured = fallback_llm.generate_structured_content(
+            user_profile=user_profile,
+            user_idea=idea if mode == 'user_idea' else None,
+            history_topics=history_topics
+        )
+
+    # 5. Create ContentPost in DB
     post = ContentPost.objects.create(
         user=user,
         title=structured.get("title", f"Video: {structured.get('topic', 'Daily Insight')}"),
@@ -61,69 +86,78 @@ def create_and_generate_post(
 
     media_dir = os.path.join(settings.BASE_DIR, 'media', 'posts', str(post.id))
     os.makedirs(media_dir, exist_ok=True)
+    start_time = time.time()
 
     try:
-        # 5. Visual background image generation
-        image_gen = AIProviderManager.get_image(
-            getattr(user_profile, 'preferred_image_gen', 'pollinations')
-        )
-        image_path = os.path.join(media_dir, 'background.jpg')
-        image_prompt = f"Cinematic vertical 9:16 background visual for {structured.get('topic')}, high quality, 8k"
-        image_gen.generate_image(
-            prompt=image_prompt,
-            output_path=image_path,
-            width=1080,
-            height=1920
-        )
-        post.media_file_path = image_path
+        # 6. Scene breakdown for video generation
+        scenes = video_provider.generate_scenes(post.script)
 
-        # 6. Audio TTS voiceover generation
-        tts_gen = AIProviderManager.get_tts(
-            getattr(user_profile, 'preferred_tts', 'default_tts')
-        )
-        audio_path = os.path.join(media_dir, 'voiceover.mp3')
-        tts_text = f"{post.hook} {post.script}"
-        tts_gen.generate_audio(
-            text=tts_text,
-            output_path=audio_path,
-            language=post.language
-        )
-        post.audio_file_path = audio_path
-
-        # 7. Render Real FFmpeg MP4 Video with Subtitles
-        video_renderer = FFmpegVideoRenderer()
+        # 7. Render Video using selected Video Provider
         video_path = os.path.join(media_dir, 'video.mp4')
-        video_renderer.render_video(
-            image_path=image_path,
-            audio_path=audio_path,
-            script_text=post.script,
+        video_provider.generate_video(
+            scenes=scenes,
             output_path=video_path,
-            duration_seconds=post.duration_seconds
+            aspect_ratio="9:16"
         )
-        
+
+        # 8. Real MP4 Video Validation
+        validation_info = validate_video_file(video_path)
+
         post.video_file_path = video_path
         post.media_file_path = video_path
+        post.audio_file_path = os.path.join(media_dir, 'voiceover.mp3')
         post.status = 'READY_MANUAL'
         post.completed_at = timezone.now()
         post.save()
+
+        # Track Usage
+        AIUsage.objects.create(
+            user=user,
+            provider=video_provider.provider_id,
+            request_type='VIDEO',
+            status='SUCCESS',
+            duration_seconds=round(time.time() - start_time, 2)
+        )
 
         SystemLog.objects.create(
             user=user,
             level='INFO',
             module='ContentService',
-            message=f"Post #{post.id} successfully rendered MP4 video."
+            message=f"Post #{post.id} ('{post.title}') rendered & validated successfully via {video_provider.name}."
         )
 
-        # 8. Telegram delivery
+        # 9. Deliver to Telegram
         if user_profile and user_profile.telegram_chat_id:
             fallback_mgr = TelegramFallbackManager()
             fallback_mgr.send_post_fallback(post)
 
-    except Exception as e:
-        logger.error(f"Post creation pipeline error for post #{post.id}: {e}")
+    except QuotaExceededException as qe:
+        logger.warning(f"Quota exceeded during post #{post.id} generation: {qe}")
+        post.status = 'WAITING_FOR_QUOTA'
+        post.error_message = str(qe)
+        post.save()
+
+        AIUsage.objects.create(
+            user=user,
+            provider=video_provider.provider_id,
+            request_type='VIDEO',
+            status='WAITING_FOR_QUOTA',
+            error_message=str(qe)
+        )
+
+    except (VideoValidationError, Exception) as e:
+        logger.error(f"Pipeline error for post #{post.id}: {e}")
         post.status = 'FAILED'
         post.error_message = str(e)
         post.save()
+
+        AIUsage.objects.create(
+            user=user,
+            provider=video_provider.provider_id,
+            request_type='VIDEO',
+            status='FAILED',
+            error_message=str(e)
+        )
 
         SystemLog.objects.create(
             user=user,
@@ -133,3 +167,4 @@ def create_and_generate_post(
         )
 
     return post
+

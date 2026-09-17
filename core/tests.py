@@ -162,3 +162,43 @@ class SecurityPathTraversalTests(TestCase):
         url = reverse('core:download_media', kwargs={'post_id': self.post.id, 'file_type': 'image'})
         response = self.client.get(url)
         self.assertIn(response.status_code, [403, 404])
+
+
+class Phase2NewFeaturesTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='phase2_user', password='password123')
+        self.profile = UserProfile.objects.create(user=self.user)
+
+    def test_google_oauth_login_redirect(self):
+        response = self.client.get(reverse('core:google_login'))
+        # Should redirect to Google or settings if not configured
+        self.assertEqual(response.status_code, 302)
+
+    def test_connected_accounts_creation_and_disconnection(self):
+        from core.models import AIProviderAccount
+        account = AIProviderAccount.objects.create(
+            user=self.user,
+            provider='google',
+            external_account_id='testuser@gmail.com',
+            status='ACTIVE'
+        )
+        self.assertEqual(account.masked_identifier(), 't•••@gmail.com')
+
+        # Test disconnect via post endpoint
+        self.client.login(username='phase2_user', password='password123')
+        disconnect_url = reverse('core:disconnect_account', kwargs={'account_id': account.id})
+        res = self.client.post(disconnect_url)
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(AIProviderAccount.objects.filter(id=account.id).exists())
+
+    def test_ai_provider_router_free_first_selection(self):
+        from services.ai.router import AIProviderRouter
+        router = AIProviderRouter(user_profile=self.profile)
+        provider = router.select_video_provider()
+        self.assertEqual(provider.provider_id, 'local')
+
+    def test_video_validator_with_nonexistent_file(self):
+        from services.video.validator import validate_video_file, VideoValidationError
+        with self.assertRaises(VideoValidationError):
+            validate_video_file('/tmp/non_existent_video_file.mp4')
+

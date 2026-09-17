@@ -17,6 +17,17 @@
         </div>
         {% endif %}
 
+        <div style="margin-bottom: 1.5rem; text-align: center;">
+            <a href="{% url 'core:google_login' %}" class="btn-secondary" style="width: 100%; justify-content: center; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; font-weight: 600; padding: 0.75rem; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <i class="fa-brands fa-google" style="color: #4285F4; font-size: 1.1rem;"></i> Continue with Google
+            </a>
+            <div style="display: flex; align-items: center; margin: 1.2rem 0; color: var(--text-muted); font-size: 0.8rem;">
+                <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);"></div>
+                <span style="padding: 0 0.8rem;">OR</span>
+                <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);"></div>
+            </div>
+        </div>
+
         <form method="POST" class="quick-draft-form">
             {% csrf_token %}
             <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Username</label>
@@ -29,6 +40,7 @@
                 <i class="fa-solid fa-right-to-bracket"></i> Sign In
             </button>
         </form>
+
 
         <div style="text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
             Don't have an account? <a href="{% url 'core:register' %}" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Create Account</a>

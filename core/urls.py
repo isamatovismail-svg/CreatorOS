@@ -6,6 +6,9 @@ app_name = 'core'
 urlpatterns = [
     path('', views.index, name='index'),
     path('register/', views.register_view, name='register'),
+    path('auth/google/login/', views.google_login, name='google_login'),
+    path('auth/google/callback/', views.google_callback, name='google_callback'),
+    path('accounts/<int:account_id>/disconnect/', views.disconnect_account, name='disconnect_account'),
     path('post/<int:post_id>/', views.post_detail, name='post_detail'),
     path('post/<int:post_id>/regenerate/', views.regenerate_post, name='regenerate_post'),
     path('post/<int:post_id>/delete/', views.delete_post, name='delete_post'),
@@ -16,3 +19,4 @@ urlpatterns = [
     path('assets/', views.assets_library_view, name='assets'),
     path('settings/', views.settings_view, name='settings'),
 ]
+

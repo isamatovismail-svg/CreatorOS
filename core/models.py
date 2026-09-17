@@ -25,11 +25,13 @@ class UserProfile(models.Model):
     timezone = models.CharField(max_length=64, default='Asia/Tashkent')
     daily_videos_per_day = models.IntegerField(default=1)
     
-    # AI BYOK Provider Settings
+    # AI BYOK & Provider Settings
     openai_api_key = models.CharField(max_length=255, blank=True, null=True)
     preferred_llm = models.CharField(max_length=64, default='default_llm')
     preferred_image_gen = models.CharField(max_length=64, default='pollinations')
     preferred_tts = models.CharField(max_length=64, default='default_tts')
+    preferred_providers = models.CharField(max_length=255, default='local,google,openai', help_text="Comma-separated provider order preference")
+    allow_paid_generation = models.BooleanField(default=False, help_text="Allow automatic use of paid AI provider credits")
 
     def generate_telegram_linking_code(self) -> str:
         """Generates a secure 6-digit short-lived linking code for Telegram account linking."""
@@ -50,6 +52,88 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
+
+
+class AIProviderAccount(models.Model):
+    PROVIDER_CHOICES = [
+        ('google', 'Google AI / Veo'),
+        ('openai', 'OpenAI / Sora'),
+        ('runway', 'Runway Gen'),
+        ('local', 'Local Fallback Engine'),
+    ]
+
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active & Connected'),
+        ('EXPIRED', 'Authorization Expired'),
+        ('DISCONNECTED', 'Disconnected'),
+        ('ERROR', 'Authorization Error'),
+    ]
+
+    QUOTA_CHOICES = [
+        ('AVAILABLE', 'Quota Available'),
+        ('EXHAUSTED', 'Quota Exhausted'),
+        ('WAITING_FOR_QUOTA', 'Waiting for Quota Reset'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_accounts')
+    provider = models.CharField(max_length=64, choices=PROVIDER_CHOICES, default='google')
+    external_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="Email or unique identifier from OAuth provider")
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='ACTIVE')
+    quota_status = models.CharField(max_length=32, choices=QUOTA_CHOICES, default='AVAILABLE')
+    
+    # Secure token storage (tokens omitted from __str__ and logs)
+    access_token = models.TextField(blank=True, null=True)
+    refresh_token = models.TextField(blank=True, null=True)
+    token_expires_at = models.DateTimeField(blank=True, null=True)
+    
+    last_used_at = models.DateTimeField(blank=True, null=True)
+    reset_at = models.DateTimeField(blank=True, null=True, help_text="Exact next quota reset time returned by provider API")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def masked_identifier(self) -> str:
+        if not self.external_account_id:
+            return "Connected OAuth Account"
+        if "@" in self.external_account_id:
+            parts = self.external_account_id.split("@")
+            name = parts[0]
+            masked_name = name[0] + "•••" if len(name) > 1 else name
+            return f"{masked_name}@{parts[1]}"
+        return f"{self.external_account_id[:4]}••••"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_provider_display()} ({self.masked_identifier()})"
+
+
+class AIUsage(models.Model):
+    REQUEST_TYPE_CHOICES = [
+        ('SCRIPT', 'Script Generation'),
+        ('SCENE', 'Scene Breakdown'),
+        ('VIDEO', 'Video Generation'),
+        ('AUDIO', 'Audio TTS'),
+        ('RENDER', 'Final Render'),
+    ]
+
+    STATUS_CHOICES = [
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+        ('WAITING_FOR_QUOTA', 'Waiting for Quota'),
+        ('QUOTA_EXCEEDED', 'Quota Exceeded'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_usages')
+    provider = models.CharField(max_length=64)
+    account = models.ForeignKey(AIProviderAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='usages')
+    request_type = models.CharField(max_length=32, choices=REQUEST_TYPE_CHOICES, default='VIDEO')
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='SUCCESS')
+    external_job_id = models.CharField(max_length=255, blank=True, null=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    duration_seconds = models.FloatField(default=0.0)
+    estimated_cost = models.DecimalField(max_digits=8, decimal_places=4, default=0.0)
+    error_message = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Usage #{self.id}: {self.provider} - {self.request_type} [{self.status}]"
 
 
 class SocialAccount(models.Model):
@@ -89,6 +173,7 @@ class ContentPost(models.Model):
         ('GENERATING', 'Generating Assets'),
         ('READY_MANUAL', 'Ready for Manual Upload (Fallback)'),
         ('PUBLISHED', 'Published via API'),
+        ('WAITING_FOR_QUOTA', 'Waiting for Quota Reset'),
         ('FAILED', 'Generation / Posting Failed'),
     ]
 
@@ -170,3 +255,4 @@ class SystemLog(models.Model):
 
     def __str__(self):
         return f"[{self.level}] {self.module} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+

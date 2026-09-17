@@ -254,6 +254,8 @@ def settings_view(request):
             profile.daily_enabled = request.POST.get('daily_enabled') == 'on'
             profile.daily_time = request.POST.get('daily_time', profile.daily_time)
             profile.timezone = request.POST.get('timezone', profile.timezone)
+            profile.allow_paid_generation = request.POST.get('allow_paid_generation') == 'on'
+            profile.preferred_providers = request.POST.get('preferred_providers', profile.preferred_providers).strip()
 
             api_key = request.POST.get('openai_api_key', '').strip()
             if api_key:
@@ -263,13 +265,168 @@ def settings_view(request):
             messages.success(request, "Content preferences and settings updated successfully!")
             return redirect('core:settings')
 
+    from .models import AIProviderAccount
+    from services.ai.router import AIProviderRouter
+
+    connected_accounts = AIProviderAccount.objects.filter(user=request.user)
+    router = AIProviderRouter(user_profile=profile)
+    providers_status = router.get_all_providers_status()
+
     context = {
         'title': 'Settings & Preferences - CreatorOS',
         'active_tab': 'settings',
         'profile': profile,
+        'connected_accounts': connected_accounts,
+        'providers_status': providers_status,
         'logs': SystemLog.objects.filter(user=request.user).order_by('-created_at')[:10],
     }
     return render(request, 'core/settings.html', context)
+
+
+# ==============================================================================
+# GOOGLE OAUTH & CONNECTED ACCOUNTS VIEWS
+# ==============================================================================
+
+import secrets
+from .oauth import (
+    get_google_auth_url,
+    exchange_code_for_tokens,
+    get_google_user_info,
+    is_google_oauth_configured
+)
+
+def google_login(request):
+    """
+    Initiates Google OAuth 2.0 flow for login or adding a connected Google account.
+    Never requests or stores Google passwords.
+    """
+    state = secrets.token_urlsafe(16)
+    request.session['oauth_state'] = state
+    
+    if request.user.is_authenticated and request.GET.get('action') == 'connect':
+        request.session['oauth_action'] = 'connect'
+    else:
+        request.session['oauth_action'] = 'login'
+
+    if not is_google_oauth_configured():
+        messages.error(
+            request, 
+            "Google OAuth is not configured on this server. "
+            "Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env."
+        )
+        return redirect('core:settings' if request.user.is_authenticated else 'login')
+
+    auth_url = get_google_auth_url(state, prompt_select=True)
+    return redirect(auth_url)
+
+
+def google_callback(request):
+    """
+    Handles Google OAuth 2.0 callback, verifies CSRF state, exchanges tokens,
+    creates/logs in user or links connected Google account.
+    """
+    stored_state = request.session.get('oauth_state')
+    received_state = request.GET.get('state')
+    code = request.GET.get('code')
+    oauth_action = request.session.get('oauth_action', 'login')
+
+    if not stored_state or stored_state != received_state:
+        messages.error(request, "Authentication failed: Invalid OAuth state parameter.")
+        return redirect('login')
+
+    if not code:
+        messages.error(request, "Authentication canceled or authorization code missing.")
+        return redirect('login')
+
+    tokens = exchange_code_for_tokens(code)
+    if not tokens or 'access_token' not in tokens:
+        messages.error(request, "Failed to obtain access tokens from Google.")
+        return redirect('login')
+
+    user_info = get_google_user_info(tokens['access_token'])
+    if not user_info or 'email' not in user_info:
+        messages.error(request, "Failed to retrieve user profile information from Google.")
+        return redirect('login')
+
+    email = user_info['email']
+    google_sub = user_info.get('sub', email)
+
+    if oauth_action == 'connect' and request.user.is_authenticated:
+        # Link additional Google Account under user's profile
+        from .models import AIProviderAccount
+        account, created = AIProviderAccount.objects.get_or_create(
+            user=request.user,
+            provider='google',
+            external_account_id=email,
+            defaults={
+                'status': 'ACTIVE',
+                'quota_status': 'AVAILABLE',
+                'access_token': tokens.get('access_token'),
+                'refresh_token': tokens.get('refresh_token'),
+            }
+        )
+        if not created:
+            account.access_token = tokens.get('access_token')
+            if tokens.get('refresh_token'):
+                account.refresh_token = tokens.get('refresh_token')
+            account.status = 'ACTIVE'
+            account.save()
+
+        messages.success(request, f"Successfully connected Google Account: {email}")
+        return redirect('core:settings')
+
+    else:
+        # User Authentication (Login or Auto-Registration via Google OAuth)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            username = email.split('@')[0]
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
+            
+            # Create user with unguessable random password; user authenticates via OAuth
+            random_password = User.objects.make_random_password()
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=random_password
+            )
+            UserProfile.objects.create(user=user)
+
+        from .models import AIProviderAccount
+        AIProviderAccount.objects.update_or_create(
+            user=user,
+            provider='google',
+            external_account_id=email,
+            defaults={
+                'status': 'ACTIVE',
+                'quota_status': 'AVAILABLE',
+                'access_token': tokens.get('access_token'),
+                'refresh_token': tokens.get('refresh_token'),
+            }
+        )
+
+        login(request, user)
+        messages.success(request, f"Welcome back, {user.username}! Signed in via Google.")
+        return redirect('core:index')
+
+
+@login_required
+def disconnect_account(request, account_id):
+    """
+    POST endpoint to safely remove/disconnect a connected AI provider account.
+    Enforces strict user ownership verification.
+    """
+    if request.method == 'POST':
+        from .models import AIProviderAccount
+        account = get_object_or_404(AIProviderAccount, id=account_id, user=request.user)
+        email = account.external_account_id or account.get_provider_display()
+        account.delete()
+        messages.success(request, f"Disconnected account '{email}'.")
+    return redirect('core:settings')
 
 
 @login_required
@@ -306,3 +463,4 @@ def download_media(request, post_id, file_type):
         filename=filename,
         content_type=content_type
     )
+

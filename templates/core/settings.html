@@ -19,8 +19,81 @@
 {% endif %}
 
 <div class="dashboard-grid">
-    <!-- Left Column: Settings Form -->
+    <!-- Left Column: Settings Form & Connected Accounts -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Connected Google Accounts Card -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-brands fa-google" style="color: #4285F4; margin-right: 0.5rem;"></i> Connected Google Accounts</h2>
+                <a href="{% url 'core:google_login' %}?action=connect" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.4rem; text-decoration: none;">
+                    <i class="fa-solid fa-plus"></i> Add Google Account
+                </a>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                {% for acc in connected_accounts %}
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 0.85rem 1rem; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.9rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fa-brands fa-google" style="color: #4285F4;"></i> {{ acc.masked_identifier }}
+                            <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
+                                {{ acc.get_status_display }}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
+                            Connected: {{ acc.created_at|date:"M d, Y H:i" }} | Quota: {{ acc.get_quota_status_display }}
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{% url 'core:disconnect_account' acc.id %}" onsubmit="return confirm('Disconnect this Google account?');">
+                        {% csrf_token %}
+                        <button type="submit" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                            <i class="fa-solid fa-trash-can"></i> Remove
+                        </button>
+                    </form>
+                </div>
+                {% empty %}
+                <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1rem 0; border: 1px dashed var(--border-color); border-radius: var(--radius-sm);">
+                    No Google accounts connected yet. Click "+ Add Google Account" to link via OAuth.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- AI Providers Status Dashboard -->
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2 class="panel-title"><i class="fa-solid fa-cpu" style="color: #818cf8; margin-right: 0.5rem;"></i> AI Provider Status Dashboard</h2>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                {% for key, prov in providers_status.items %}
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">{{ prov.name }}</span>
+                        {% if prov.configured %}
+                            <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">Configured ✓</span>
+                        {% else %}
+                            <span style="background: rgba(107, 114, 128, 0.2); color: #9ca3af; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">Not Configured</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div style="font-size: 0.8rem; margin-bottom: 0.3rem;">
+                        <span style="color: var(--text-muted);">Status:</span> 
+                        <strong style="color: {% if prov.status == 'AVAILABLE' %}#10b981{% elif prov.status == 'QUOTA_EXHAUSTED' %}#ef4444{% else %}#9ca3af{% endif %};">
+                            {{ prov.status }}
+                        </strong>
+                    </div>
+                    
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">
+                        Type: {{ prov.type }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <!-- Telegram Linking Card -->
         <div class="card-panel">
             <div class="panel-header">
@@ -89,6 +162,21 @@
                 <input type="number" name="duration_seconds" value="{{ profile.duration_seconds|default:45 }}" min="15" max="90">
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+                    <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">Preferred AI Providers Order (Comma-separated)</label>
+                    <input type="text" name="preferred_providers" value="{{ profile.preferred_providers|default:'local,google,openai' }}" placeholder="local,google,openai">
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <div>
+                            <span style="font-weight: 600; display: block;">Allow Paid AI Generation</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">When off, system strictly uses free & local providers</span>
+                        </div>
+                        <input type="checkbox" name="allow_paid_generation" style="width: 20px; height: 20px;" {% if profile.allow_paid_generation %}checked{% endif %}>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
                     <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">OpenAI API Key (BYOK Key)</label>
                     <input type="password" name="openai_api_key" placeholder="{{ profile.masked_openai_key }}">
                 </div>
@@ -140,4 +228,5 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
