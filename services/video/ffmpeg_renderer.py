@@ -1,7 +1,7 @@
 import os
 import subprocess
 import logging
-from typing import Optional
+from typing import Optional, List
 from services.ai_provider.base import BaseVideoProvider
 from services.video.subtitle_generator import SubtitleGenerator
 
@@ -89,6 +89,82 @@ class FFmpegVideoRenderer(BaseVideoProvider):
         self.validate_mp4(output_path)
 
         logger.info(f"Successfully rendered valid MP4 video at {output_path} ({os.path.getsize(output_path)} bytes)")
+        return output_path
+
+    def concat_video_clips(
+        self,
+        clip_paths: List[str],
+        audio_path: str,
+        script_text: str,
+        output_path: str,
+        duration_seconds: int = 45
+    ) -> str:
+        """
+        Concatenates multiple moving video clip files, overlays TTS voiceover audio,
+        applies 9:16 vertical aspect ratio scaling (1080x1920), and burns subtitles.
+        """
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        valid_clips = [p for p in clip_paths if os.path.exists(p) and os.path.getsize(p) > 0]
+        if not valid_clips:
+            raise ValueError("No valid scene video clips provided for concatenation.")
+
+        if not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
+            raise ValueError(f"Invalid audio asset: {audio_path} does not exist or is empty.")
+
+        out_dir = os.path.dirname(output_path)
+        concat_txt = os.path.join(out_dir, "concat_clips.txt")
+        with open(concat_txt, "w") as f:
+            for clip in valid_clips:
+                f.write(f"file '{clip}'\n")
+
+        actual_duration = self._get_audio_duration(audio_path) or float(duration_seconds)
+
+        # Generate SRT Subtitle file
+        srt_path = output_path.rsplit(".", 1)[0] + ".srt"
+        SubtitleGenerator.generate_srt(script_text, actual_duration, srt_path)
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_txt,
+            "-i", audio_path,
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-pix_fmt", "yuv420p",
+            "-vf", f"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,subtitles='{srt_path.replace(':', r'\\:')}'",
+            "-shortest",
+            "-t", str(actual_duration),
+            output_path
+        ]
+
+        logger.info(f"Executing FFmpeg multi-scene video concat command for {output_path}...")
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            if res.returncode != 0:
+                logger.warning(f"FFmpeg subtitle filter concat failed ({res.stderr[:200]}), attempting simple render fallback...")
+                cmd_fallback = [
+                    "ffmpeg", "-y",
+                    "-f", "concat", "-safe", "0", "-i", concat_txt,
+                    "-i", audio_path,
+                    "-c:v", "libx264",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-pix_fmt", "yuv420p",
+                    "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
+                    "-shortest",
+                    "-t", str(actual_duration),
+                    output_path
+                ]
+                res_fb = subprocess.run(cmd_fallback, capture_output=True, text=True, timeout=180)
+                if res_fb.returncode != 0:
+                    raise RuntimeError(f"FFmpeg multi-scene concat failed: {res_fb.stderr}")
+        except Exception as e:
+            logger.error(f"FFmpeg concat process error: {e}")
+            raise RuntimeError(f"FFmpeg multi-scene concat error: {e}")
+
+        self.validate_mp4(output_path)
+        logger.info(f"Successfully concatenated multi-scene video at {output_path} ({os.path.getsize(output_path)} bytes)")
         return output_path
 
     def validate_mp4(self, video_path: str):

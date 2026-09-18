@@ -75,7 +75,7 @@ class AIProviderRouter:
 
         # Default fallback to Local Engine
         local_provider = all_providers.get('local')
-        logger.info(f"Using Local Fallback Engine for video generation.")
+        logger.info("No free real-video provider is currently configured. Using Local Fallback Engine for video generation.")
         return local_provider
 
     def select_llm_provider(self) -> BaseAIProvider:

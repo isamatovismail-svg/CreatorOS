@@ -19,6 +19,45 @@ CreatorOS is an enterprise-grade personal AI short-form vertical video platform 
 
 ---
 
+## 🎬 Video Provider Architecture
+
+CreatorOS strictly separates **Real Moving Video Providers** from **Local Fallback Engines**.
+
+### REAL VIDEO PROVIDERS
+
+1. **Google AI (Veo / Gemini)**
+   - **Status:** Implemented (`google-genai` official SDK)
+   - **Model:** `veo-2.0-generate-001` (video clips) & `gemini-2.5-flash` (structured script)
+   - **Credential Required:** `GOOGLE_VEO_API_KEY` or `GEMINI_API_KEY`
+   - **Pricing:** Paid API (Requires Google Cloud / Google AI Studio billing)
+   - **Output:** 9:16 vertical MP4 video clips concatenated into final 1080x1920 MP4
+   - **Quota Behavior:** 429 / ResourceExhausted updates `AIProviderAccount.quota_status = 'EXHAUSTED'` and sets post to `WAITING_FOR_QUOTA`
+
+2. **OpenAI (Sora / GPT)**
+   - **Status:** Adapter / Placeholder
+   - **Credential Required:** `OPENAI_API_KEY`
+   - **Pricing:** Paid API
+   - **Output:** 9:16 vertical MP4 video
+   - **Quota Behavior:** Quota error sets post to `WAITING_FOR_QUOTA`
+
+3. **Runway Gen-3**
+   - **Status:** Adapter / Placeholder
+   - **Credential Required:** `RUNWAY_API_KEY`
+   - **Pricing:** Paid API
+   - **Output:** 9:16 vertical MP4 video
+   - **Quota Behavior:** Quota error sets post to `WAITING_FOR_QUOTA`
+
+### LOCAL FALLBACK
+
+1. **Local Fallback Engine**
+   - **Status:** Fully Functional
+   - **Credential Required:** None
+   - **Pricing:** Free local generation
+   - **Output:** 9:16 vertical MP4 video (Pollinations visual background + gTTS voiceover + FFmpeg renderer + SRT subtitles)
+   - **Usage:** Used automatically when `allow_paid_generation=False` or when no paid API provider is configured. Displays message: `"No free real-video provider is currently configured. Using Local Fallback Engine."`
+
+---
+
 ## 🚀 Quick Start Guide
 
 ### 1. Prerequisites

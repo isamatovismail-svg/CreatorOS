@@ -30,11 +30,16 @@ def create_and_generate_post(
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         existing_today = ContentPost.objects.filter(
             user=user,
-            created_at__gte=today_start
+            created_at__gte=today_start,
+            status__in=['READY_MANUAL', 'PUBLISHED']
         ).exists()
         if existing_today:
             logger.info(f"Daily generation skipped for {user.username}: already generated today.")
-            return ContentPost.objects.filter(user=user, created_at__gte=today_start).first()
+            return ContentPost.objects.filter(
+                user=user,
+                created_at__gte=today_start,
+                status__in=['READY_MANUAL', 'PUBLISHED']
+            ).first()
 
     # 2. Gather topic history for freshness
     history_topics = list(

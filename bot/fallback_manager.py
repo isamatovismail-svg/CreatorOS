@@ -37,14 +37,13 @@ class TelegramFallbackManager:
         post.save()
 
         formatted_message = (
-            f"📱 <b>[CreatorOS Video Delivery]</b>\n\n"
-            f"🎬 <b>Title:</b> {post.title}\n"
-            f"⚡ <b>Hook:</b> {post.hook}\n\n"
-            f"📝 <b>Caption:</b>\n{post.caption}\n\n"
-            f"🏷️ <b>Hashtags:</b>\n{post.hashtags}\n\n"
+            f"🎬 <b>Your daily video is ready</b>\n\n"
+            f"<b>Title:</b>\n{post.title}\n\n"
+            f"<b>Caption:</b>\n{post.caption}\n\n"
+            f"<b>Hashtags:</b>\n{post.hashtags}\n\n"
+            f"⚡ <b>Hook:</b> {post.hook}\n"
             f"💡 <b>Promotion Tips:</b> {post.promotion_tips}\n"
-            f"⏰ <b>Best Time to Post:</b> {post.recommended_publish_time}\n\n"
-            f"📂 <i>Your vertical 9:16 video is ready below! Upload to Shorts / Reels / TikTok.</i>"
+            f"⏰ <b>Best Time to Post:</b> {post.recommended_publish_time}"
         )
 
         success = False

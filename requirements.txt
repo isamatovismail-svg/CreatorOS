@@ -5,3 +5,4 @@ requests>=2.31.0
 gTTS>=2.5.0
 python-dotenv>=1.0.0
 django-sslserver>=0.22
+google-genai>=2.0.0

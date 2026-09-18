@@ -202,3 +202,81 @@ class Phase2NewFeaturesTests(TestCase):
         with self.assertRaises(VideoValidationError):
             validate_video_file('/tmp/non_existent_video_file.mp4')
 
+
+class GoogleAIProviderAdapterMockTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='google_test_user', password='password123')
+        self.profile = UserProfile.objects.create(user=self.user)
+
+    def test_google_adapter_unconfigured_by_default(self):
+        from services.ai.providers.google import GoogleAIAdapter
+        from services.ai.base import ProviderNotConfiguredException
+        
+        adapter = GoogleAIAdapter()
+        if not os.getenv("GOOGLE_VEO_API_KEY") and not os.getenv("GEMINI_API_KEY"):
+            self.assertFalse(adapter.is_configured(self.profile))
+            with self.assertRaises(ProviderNotConfiguredException):
+                adapter.generate_script(self.profile, "test idea")
+
+    def test_google_adapter_scene_generation(self):
+        from services.ai.providers.google import GoogleAIAdapter
+        adapter = GoogleAIAdapter()
+        scenes = adapter.generate_scenes("Scene 1 narration. Scene 2 narration. Scene 3 narration.")
+        self.assertEqual(len(scenes), 3)
+        self.assertIn("scene_number", scenes[0])
+        self.assertIn("prompt", scenes[0])
+        self.assertIn("narration", scenes[0])
+
+
+class RealVideoProviderIntegrationTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='real_video_creator', password='password123')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            allow_paid_generation=True,
+            preferred_providers='google,local'
+        )
+
+    def test_real_google_veo_video_generation_pipeline(self):
+        real_test_enabled = os.getenv("CREATOROS_REAL_VIDEO_TEST", "").lower() == "true"
+        api_key = os.getenv("GOOGLE_VEO_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+
+        if not real_test_enabled or not api_key:
+            self.skipTest(
+                "Skipping real video provider integration test. "
+                "To run this test, set CREATOROS_REAL_VIDEO_TEST=true and configure GOOGLE_VEO_API_KEY in environment."
+            )
+
+        from services.pipeline.service import create_and_generate_post
+        from services.video.validator import validate_video_file
+
+        post = create_and_generate_post(
+            user=self.user,
+            idea="dog learns programming",
+            mode="user_idea"
+        )
+
+        self.assertEqual(post.status, "READY_MANUAL")
+        self.assertIsNotNone(post.video_file_path)
+        self.assertTrue(os.path.exists(post.video_file_path))
+
+        val_result = validate_video_file(post.video_file_path)
+        self.assertTrue(val_result['valid'])
+        self.assertGreater(val_result['file_size'], 0)
+        self.assertGreater(val_result['duration'], 0)
+        self.assertTrue(val_result['has_audio'])
+
+        print("\n==========================================")
+        print("REAL VIDEO GENERATION TEST REPORT")
+        print("==========================================")
+        print("Provider: Google AI (Veo)")
+        print(f"Post ID: #{post.id}")
+        print(f"Video Path: {post.video_file_path}")
+        print(f"Duration: {val_result['duration']:.2f}s")
+        print(f"Resolution: {val_result['width']}x{val_result['height']}")
+        print(f"Video Codec: {val_result['video_codec']}")
+        print("Audio Stream: Present")
+        print(f"File Size: {val_result['file_size']} bytes")
+        print("Validation Result: PASS")
+        print("==========================================\n")
+

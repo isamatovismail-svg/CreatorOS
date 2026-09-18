@@ -59,6 +59,9 @@ def validate_video_file(file_path: str, min_duration: float = 1.0) -> Dict[str, 
     if not video_streams:
         raise VideoValidationError("Validation failed: No video stream found in MP4 file.")
 
+    if not audio_streams:
+        raise VideoValidationError("Validation failed: No audio stream found in MP4 file.")
+
     video_stream = video_streams[0]
     width = int(video_stream.get('width', 0))
     height = int(video_stream.get('height', 0))

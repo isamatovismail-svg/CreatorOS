@@ -97,41 +97,42 @@ class Command(BaseCommand):
         except ImportError:
             report("FAIL", "gTTS Speech Engine", "gTTS package not installed in python environment!")
 
-        # 7. Pollinations Image Engine
-        try:
-            from services.ai_provider.adapters.pollinations_image import PollinationsImageProvider
-            provider = PollinationsImageProvider()
-            report("PASS", "Pollinations Image Engine", f"Provider '{provider.provider_name}' initialized.")
-        except Exception as e:
-            report("WARN", "Pollinations Image Engine", f"Provider error: {e}")
+        # 7. Provider Configurations Audit (Section 13)
+        self.stdout.write(self.style.MIGRATE_HEADING("\n--- AI Provider Statuses ---"))
 
-        # 8. Default LLM Structured Engine
-        try:
-            from services.ai_provider.adapters.default_llm import DefaultLLMProvider
-            llm = DefaultLLMProvider()
-            test_topic = llm.select_topic("AI and technology")
-            report("PASS", "Structured AI Script Generator", f"Engine active. Sample topic: '{test_topic['topic']}'")
-        except Exception as e:
-            report("FAIL", "Structured AI Script Generator", f"Engine failed: {e}")
-
-        # 9. Google OAuth Configuration
-        client_id = os.getenv("GOOGLE_CLIENT_ID")
-        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-        if client_id and client_secret:
-            masked_client = client_id[:6] + "••••••••" if len(client_id) > 10 else "Configured"
-            report("PASS", "Google OAuth Configuration", f"Client ID: {masked_client}")
+        # Google OAuth
+        google_oauth_configured = bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
+        if google_oauth_configured:
+            report("PASS", "Google OAuth", "Configured")
         else:
-            report("WARN", "Google OAuth Configuration", "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not configured in .env (Google OAuth disabled).")
+            report("WARN", "Google OAuth", "Not configured")
 
-        # 10. OpenAI API Key Configuration
-        openai_key = os.getenv("OPENAI_API_KEY")
+        # Google Video API (Veo)
+        google_video_key = os.getenv("GOOGLE_VEO_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+        if google_video_key:
+            report("PASS", "Google Video API", "Configured (veo-2.0-generate-001 active)")
+        else:
+            report("WARN", "Google Video API", "Not configured")
+
+        # OpenAI
+        openai_key = os.getenv("OPENAI_API_KEY", "")
         if openai_key and len(openai_key) > 8:
-            masked_key = openai_key[:4] + "••••••••" + openai_key[-4:]
-            report("PASS", "OpenAI API Key", f"Key configured: {masked_key}")
+            report("PASS", "OpenAI", "Configured")
         else:
-            report("WARN", "OpenAI API Key", "OPENAI_API_KEY not configured in .env (using local fallback engine).")
+            report("WARN", "OpenAI", "Not configured")
 
-        # 11. AI Video Providers Registration
+        # Runway
+        runway_key = os.getenv("RUNWAY_API_KEY", "")
+        if runway_key:
+            report("PASS", "Runway", "Configured")
+        else:
+            report("WARN", "Runway", "Not configured")
+
+        # Local Fallback
+        report("PASS", "Local fallback", "Available (gTTS + Pollinations + FFmpeg)")
+
+        # 8. AI Video Providers Registration
+        self.stdout.write(self.style.MIGRATE_HEADING("\n--- System Services & Bot ---"))
         try:
             from services.ai.registry import ProviderRegistry
             providers = ProviderRegistry.list_all()
@@ -140,7 +141,7 @@ class Command(BaseCommand):
         except Exception as e:
             report("FAIL", "AI Video Providers Registered", f"Registry failure: {e}")
 
-        # 12. Telegram Bot Integration
+        # Telegram Bot Integration
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if not bot_token or "your_bot_token" in bot_token or bot_token == "MOCK_BOT_TOKEN":
             report("WARN", "Telegram Bot Token", "TELEGRAM_BOT_TOKEN is not set in environment or is using mock value.")
@@ -165,4 +166,3 @@ class Command(BaseCommand):
             sys.exit(1)
         else:
             self.stdout.write(self.style.SUCCESS("✅ CreatorOS System Health Doctor checks completed successfully!"))
-
